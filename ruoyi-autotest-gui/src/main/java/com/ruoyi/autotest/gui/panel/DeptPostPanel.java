@@ -295,25 +295,30 @@ public class DeptPostPanel extends JPanel {
         appendLogSeparator("性能测试：部门列表接口");
         new Thread(() -> {
             appendLog("[性能测试] 正在自动搜索本机 JMeter 安装...");
-            String jmeterHome = findJmeterHome();
-            if (jmeterHome == null) {
-                appendLog("[性能测试] 未找到 JMeter，请将 JMeter 解压到 C:\\apache-jmeter 或 D:\\apache-jmeter 目录。");
+            File jmeterExecutable = findJmeterExecutable();
+            if (jmeterExecutable == null) {
+                appendLog("[性能测试] 未找到 JMeter，请确认 D:\\apache-jmeter\\bin\\jmeter.bat 是否存在。");
                 return;
             }
 
-            String scriptPath = jmeterHome + "\\bin\\RuoYi_DeptPost_Test.jmx";
-            String jmeterCmd = jmeterHome + "\\bin\\jmeter.bat";
-            File scriptFile = new File(scriptPath);
+            File jmeterBinDir = jmeterExecutable.getParentFile();
+            File scriptFile = new File(jmeterBinDir, "RuoYi_DeptPost_Test.jmx");
             if (!scriptFile.exists()) {
-                appendLog("[性能测试] 未找到 JMX 脚本: " + scriptPath);
+                appendLog("[性能测试] 未找到 JMX 脚本: " + scriptFile.getAbsolutePath());
                 appendLog("[性能测试] 请将部门与岗位模块性能测试脚本命名为 RuoYi_DeptPost_Test.jmx 并放入 JMeter bin 目录。");
                 return;
             }
 
-            appendLog("[性能测试] 启动 JMeter: " + scriptPath);
+            appendLog("[性能测试] 启动 JMeter: " + scriptFile.getAbsolutePath());
             try {
                 String resultFile = "jmeter_dept_post_result.jtl";
-                ProcessBuilder pb = new ProcessBuilder(jmeterCmd, "-n", "-t", scriptPath, "-l", resultFile);
+                ProcessBuilder pb = new ProcessBuilder(
+                    jmeterExecutable.getAbsolutePath(),
+                    "-n",
+                    "-t",
+                    scriptFile.getAbsolutePath(),
+                    "-l",
+                    resultFile);
                 pb.inheritIO();
                 Process process = pb.start();
                 int exitCode = process.waitFor();
@@ -328,46 +333,20 @@ public class DeptPostPanel extends JPanel {
         }).start();
     }
 
-    private String findJmeterHome() {
-        String envHome = System.getenv("JMETER_HOME");
-        if (hasJmeter(envHome)) {
-            return envHome;
-        }
-
-        String[] searchDirs = {
-            "C:\\apache-jmeter\\apache-jmeter-5.6.3",
-            "C:\\apache-jmeter\\apache-jmeter-5.6.2",
-            "C:\\apache-jmeter\\apache-jmeter-5.5",
-            "D:\\apache-jmeter\\apache-jmeter-5.6.3",
-            "D:\\apache-jmeter\\apache-jmeter-5.6.2",
-            "D:\\apache-jmeter\\apache-jmeter-5.5"
+    private File findJmeterExecutable() {
+        String[] executablePaths = {
+            "D:\\apache-jmeter\\bin\\jmeter.bat",
+            "C:\\apache-jmeter\\bin\\jmeter.bat",
+            "D:\\apache-jmeter\\bin\\jmeter",
+            "C:\\apache-jmeter\\bin\\jmeter"
         };
-        for (String dir : searchDirs) {
-            if (hasJmeter(dir)) {
-                return dir;
-            }
-        }
 
-        String found = findJmeterUnderRoot("C:\\apache-jmeter");
-        if (found != null) {
-            return found;
-        }
-        return findJmeterUnderRoot("D:\\apache-jmeter");
-    }
-
-    private boolean hasJmeter(String dir) {
-        return dir != null && !dir.isEmpty() && new File(dir, "bin\\jmeter.bat").exists();
-    }
-
-    private String findJmeterUnderRoot(String rootPath) {
-        File root = new File(rootPath);
-        File[] subs = root.isDirectory() ? root.listFiles() : null;
-        if (subs == null) {
-            return null;
-        }
-        for (File sub : subs) {
-            if (sub.isDirectory() && hasJmeter(sub.getAbsolutePath())) {
-                return sub.getAbsolutePath();
+        for (String path : executablePaths) {
+            File executable = new File(path);
+            appendLog("[性能测试] 检查 JMeter 路径：" + path + "，exists=" + executable.exists());
+            if (executable.exists() && executable.isFile()) {
+                appendLog("[性能测试] 已找到 JMeter：" + executable.getAbsolutePath());
+                return executable;
             }
         }
         return null;
